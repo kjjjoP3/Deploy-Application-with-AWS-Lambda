@@ -1,58 +1,36 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
 org: thanhbt29
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
 app: serverless-todo-app-v3
 service: serverless-todo-app-v3
-frameworkVersion: '3.32.0'
 
 plugins:
-  - serverless-webpack
   - serverless-iam-roles-per-function
-  - serverless-plugin-tracing
 
-custom:
-  documentation:
-    api:
-      info:
-        version: v1.0.0
-        title: Todo APP
-        description: Serverless application Todo app
-    models:
-      - name: CreateTodoRequest
-        contentType: application/json
-        schema: ${file(model/create-todo-model.json)}
-      - name: UpdateTodoRequest
-        contentType: application/json
-        schema: ${file(model/update-todo-model.json)}
 
 provider:
   name: aws
-  runtime: nodejs18.x
+  runtime: nodejs20.x
   stage: ${opt:stage, 'dev'}
-  region: ${opt:region, 'us-west-2'}
-  profile: default
+  region: ${opt:region, 'us-east-1'}
+
   tracing:
     lambda: true
     apiGateway: true
-  environment:
-    TODOS_TABLE: todo-app-${self:provider.stage}
-    TODOS_CREATED_AT_INDEX: CreatedAtIndex
-    ATTACHMENT_S3_BUCKET: todo-app-images-${self:provider.stage}
-    SIGNED_URL_EXPIRATION: 300
-    PROJECT_NAME: 'todo-app'
-    INDEX_NAME: ${self:provider.environment.TODOS_CREATED_AT_INDEX}
-
+  
   logs:
     restApi: true
 
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - xray:PutTelemetryRecords
-            - xray:PutTraceSegments
-          Resource: '*'
+  environment:
+    TODOS_TABLE: Todos1-${self:provider.stage}
+    TODOS_CREATED_AT_INDEX: CreatedAtIndex
+    S3_BUCKET: udagram-attachments-camnx-${self:provider.stage}
+    SIGNED_URL_EXPIRATION: 3600
+    TODOS_USER_INDEX: TodoUserIndex
+    PROJECT_NAME: Todo
 
 functions:
+
   Auth:
     handler: src/lambda/auth/auth0Authorizer.handler
 
@@ -72,9 +50,10 @@ functions:
       - Effect: Allow
         Action:
           - dynamodb:Query
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.INDEX_NAME}
+        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}/index/${self:provider.environment.TODOS_CREATED_AT_INDEX}
       - Effect: Allow
         Action:
+          - xray:PutTelemetryRecords
           - xray:PutTraceSegments
         Resource: '*'
 
@@ -84,11 +63,11 @@ functions:
       - http:
           method: post
           path: todos
-          cors: true
           authorizer: Auth
+          cors: true
           request:
             schemas:
-              'application/json': ${file(model/create-todo-model.json)}
+              application/json: ${file(models/create-todo-request.json)}
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -97,7 +76,8 @@ functions:
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
-        Resource: '*'
+        Resource:
+          - '*'
 
   UpdateTodo:
     handler: src/lambda/http/updateTodo.handler
@@ -105,8 +85,11 @@ functions:
       - http:
           method: patch
           path: todos/{todoId}
-          cors: true
           authorizer: Auth
+          cors: true
+          request:
+            schemas:
+              application/json: ${file(models/update-todo-request.json)}
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -124,13 +107,14 @@ functions:
       - http:
           method: delete
           path: todos/{todoId}
-          cors: true
           authorizer: Auth
+          cors: true
     iamRoleStatements:
       - Effect: Allow
         Action:
-          - dynamodb:DeleteItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+          - dynamodb:deleteItem
+        Resource:
+          - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
@@ -143,23 +127,24 @@ functions:
       - http:
           method: post
           path: todos/{todoId}/attachment
-          cors: true
           authorizer: Auth
+          cors: true
     iamRoleStatements:
       - Effect: Allow
         Action:
           - s3:PutObject
-          - s3:GetObject
-        Resource: arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*
+        Resource: arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*
       - Effect: Allow
         Action:
-          - dynamodb:UpdateItem
-        Resource: arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
+          - dynamodb:updateItem
+        Resource:
+          - arn:aws:dynamodb:${self:provider.region}:*:table/${self:provider.environment.TODOS_TABLE}
       - Effect: Allow
         Action:
           - xray:PutTraceSegments
         Resource:
           - '*'
+
 resources:
   Resources:
     GatewayResponseDefault4XX:
@@ -203,14 +188,14 @@ resources:
     AttachmentsBucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: ${self:provider.environment.ATTACHMENT_S3_BUCKET}
-        OwnershipControls:
-          Rules:
-            - ObjectOwnership: ObjectWriter
+        BucketName: ${self:provider.environment.S3_BUCKET}
+        
         PublicAccessBlockConfiguration:
           BlockPublicAcls: false
           BlockPublicPolicy: false
           IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+
         CorsConfiguration:
           CorsRules:
             - AllowedOrigins:
@@ -229,21 +214,12 @@ resources:
       Type: AWS::S3::BucketPolicy
       Properties:
         PolicyDocument:
-          Id: MyPolicy
+          Id: UdacityServerlessTodo
           Version: '2012-10-17'
           Statement:
             - Sid: PublicReadForGetBucketObjects
               Effect: Allow
               Principal: '*'
               Action: 's3:GetObject'
-              Resource: 'arn:aws:s3:::${self:provider.environment.ATTACHMENT_S3_BUCKET}/*'
+              Resource: 'arn:aws:s3:::${self:provider.environment.S3_BUCKET}/*'
         Bucket: !Ref AttachmentsBucket
-
-    RequestBodyValidator:
-      Type: AWS::ApiGateway::RequestValidator
-      Properties:
-        Name: 'request-body-validator'
-        RestApiId:
-          Ref: ApiGatewayRestApi
-        ValidateRequestBody: true
-        ValidateRequestParameters: false

@@ -5,6 +5,7 @@
     "serverless-webpack": "^5.15.0"
   },
   "dependencies": {
-    "serverless-plugin-tracing": "^2.0.0"
+    "serverless-plugin-tracing": "^2.0.0",
+    "typescript": "^5.6.3"
   }
 }
