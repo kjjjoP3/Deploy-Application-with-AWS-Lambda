@@ -1,7 +1,7 @@
 import Axios from 'axios'
 
 export async function getTodos(idToken) {
-  console.log('Fetching todos')
+  console.log('Fetching todos: ', `${process.env.REACT_APP_API_ENDPOINT}/todos`)
 
   const response = await Axios.get(
     `${process.env.REACT_APP_API_ENDPOINT}/todos`,
