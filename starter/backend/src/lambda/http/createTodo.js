@@ -1,10 +1,10 @@
-import middy from '@middy/core'
-import cors from '@middy/http-cors'
-import httpErrorHandler from '@middy/http-error-handler'
-import { getUserId } from '../utils.mjs'
-import { createTodoLogic } from '../../businessLogic/todos.mjs'
+import middy from '@middy/core';
+import cors from '@middy/http-cors';
+import httpErrorHandler from '@middy/http-error-handler';
+import { getUserId } from '../utils.mjs';
+import { createTodoLogic } from '../../businessLogic/todos.mjs';
 
-// TODO: Implement creating a new TODO item
+// TODO: Implement functionality for adding a new TODO item
 
 export const handler = middy()
   .use(httpErrorHandler())
@@ -14,15 +14,16 @@ export const handler = middy()
     })
   )
   .handler(async (event) => {
-    const newTodo = JSON.parse(event.body)
-    const userId = getUserId(event)
-    const todo = await createTodoLogic(userId, newTodo)
-    const response = { item: todo };
+    const newTodoData = JSON.parse(event.body);
+    const userId = getUserId(event); 
+    const createdTodo = await createTodoLogic(userId, newTodoData);
+    const response = { item: createdTodo };
+
     return {
       statusCode: 201,
       headers: {
         'Access-Control-Allow-Origin': '*'
       },
-      body: JSON.stringify(response)
-    }
-  })
+      body: JSON.stringify(response) 
+    };
+  });
